@@ -13,19 +13,16 @@ line_re_26 = re.compile(r"""
     """, re.VERBOSE)
 
 class StatCounter(object):
-
-    def __init__(self, prefix_delim=':', redis_version=2.6):
+    def __init__(self, redis_version=2.6):
         self.line_count = 0
         self.skipped_lines = 0
         self.commands = defaultdict(int)
         self.keys = defaultdict(int)
-        self.prefixes = defaultdict(int)
         self.times = []
         self._cached_sorts = {}
         self.start_ts = None
         self.last_ts = None
         self.last_entry = None
-        self.prefix_delim = prefix_delim
         self.redis_version = redis_version
         self.line_re = line_re_24 if self.redis_version < 2.5 else line_re_26
 
@@ -48,10 +45,8 @@ class StatCounter(object):
         self.commands[entry['command']] += 1
 
     def _record_key(self, key):
-        self.keys[key] += 1
-        parts = key.split(self.prefix_delim)
-        if len(parts) > 1:
-            self.prefixes[parts[0]] += 1
+        formatted_key = re.sub('\d{4,}', '#', key)
+        self.keys[formatted_key] += 1
 
     @staticmethod
     def _reformat_entry(entry):
@@ -135,7 +130,6 @@ class StatCounter(object):
 
     def print_stats(self):
         self._pretty_print(self._general_stats(), 'Overall Stats')
-        self._pretty_print(self._top_n(self.prefixes), 'Top Prefixes', percentages = True)
         self._pretty_print(self._top_n(self.keys), 'Top Keys', percentages = True)
         self._pretty_print(self._top_n(self.commands), 'Top Commands', percentages = True)
         self._pretty_print(self._time_stats(self.times), 'Command Time (microsecs)')
@@ -162,18 +156,12 @@ if __name__ == '__main__':
         nargs = '?',
         help = "File to parse; will read from stdin otherwise")
     parser.add_argument(
-        '--prefix-delimiter',
-        type = str,
-        default = ':',
-        help = "String to split on for delimiting prefix and rest of key",
-        required = False)
-    parser.add_argument(
         '--redis-version',
         type = float,
         default = 2.6,
         help = "Version of the redis server being monitored",
         required = False)
     args = parser.parse_args()
-    counter = StatCounter(prefix_delim = args.prefix_delimiter, redis_version = args.redis_version)
+    counter = StatCounter(redis_version=args.redis_version)
     counter.process_input(args.input)
     counter.print_stats()
