@@ -3,13 +3,14 @@ import argparse
 import sys
 from collections import defaultdict
 import re
+import socket
 
 line_re_24 = re.compile(r"""
     ^(?P<timestamp>[\d\.]+)\s(\(db\s(?P<db>\d+)\)\s)?"(?P<command>\w+)"(\s"(?P<key>[^(?<!\\)"]+)(?<!\\)")?(\s(?P<args>.+))?$
     """, re.VERBOSE)
 
 line_re_26 = re.compile(r"""
-    ^(?P<timestamp>[\d\.]+)\s\[(?P<db>\d+)\s\d+\.\d+\.\d+\.\d+:\d+]\s"(?P<command>\w+)"(\s"(?P<key>[^(?<!\\)"]+)(?<!\\)")?(\s(?P<args>.+))?$
+    ^(?P<timestamp>[\d\.]+)\s\[(?P<db>\d+)\s(?P<ip>\d+\.\d+\.\d+\.\d+):\d+]\s"(?P<command>\w+)"(\s"(?P<key>[^(?<!\\)"]+)(?<!\\)")?(\s(?P<args>.+))?$
     """, re.VERBOSE)
 
 class StatCounter(object):
@@ -44,8 +45,10 @@ class StatCounter(object):
     def _record_command(self, entry):
         self.commands[entry['command']] += 1
 
-    def _record_key(self, key):
+    def _record_key(self, key, ip):
         formatted_key = re.sub('\d{4,}', '#', key)
+        (host, _, _) = socket.gethostbyaddr(ip)
+        formatted_key = formatted_key + "@" + host
         self.keys[formatted_key] += 1
 
     @staticmethod
@@ -104,11 +107,11 @@ class StatCounter(object):
         self._record_duration(entry)
         self._record_command(entry)
         if entry['key']:
-            self._record_key(entry['key'])
+            self._record_key(entry['key'], entry['ip'])
 
-    def _top_n(self, stat, n=8):
+    def _top_n(self, stat):
         sorted_items = sorted(stat.iteritems(), key = lambda x: x[1], reverse = True)
-        return sorted_items[:n]
+        return sorted_items[:]
 
     def _pretty_print(self, result, title, percentages=False):
         print title
