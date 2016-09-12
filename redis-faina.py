@@ -47,8 +47,11 @@ class StatCounter(object):
 
     def _record_key(self, key, ip):
         formatted_key = re.sub('\d{4,}', '#', key)
-        (host, _, _) = socket.gethostbyaddr(ip)
-        formatted_key = formatted_key + "@" + host
+        try:
+            (host, _, _) = socket.gethostbyaddr(ip)
+            formatted_key = formatted_key + "@" + host
+        except socket.herror:
+            formatted_key = formatted_key + "@" + ip
         self.keys[formatted_key] += 1
 
     @staticmethod
