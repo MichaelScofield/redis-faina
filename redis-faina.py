@@ -5,12 +5,13 @@ from collections import defaultdict
 import re
 import socket
 
-line_re_24 = re.compile(r"""
-    ^(?P<timestamp>[\d\.]+)\s(\(db\s(?P<db>\d+)\)\s)?"(?P<command>\w+)"(\s"(?P<key>[^(?<!\\)"]+)(?<!\\)")?(\s(?P<args>.+))?$
-    """, re.VERBOSE)
-
 line_re_26 = re.compile(r"""
     ^(?P<timestamp>[\d\.]+)\s\[(?P<db>\d+)\s(?P<ip>\d+\.\d+\.\d+\.\d+):\d+]\s"(?P<command>\w+)"(\s"(?P<key>[^(?<!\\)"]+)(?<!\\)")?(\s(?P<args>.+))?$
+    """, re.VERBOSE)
+
+# For Redisproxy.
+line_re_99 = re.compile(r"""
+    ^(?P<timestamp>[\d\.]+)\s\[/(?P<ip>\d+\.\d+\.\d+\.\d+):\d+]\s"(?P<command>\w+)"(\s"(?P<key>[^(?<!\\)"]+)(?<!\\)")?(\s(?P<args>.+))?$
     """, re.VERBOSE)
 
 class StatCounter(object):
@@ -25,7 +26,7 @@ class StatCounter(object):
         self.last_ts = None
         self.last_entry = None
         self.redis_version = redis_version
-        self.line_re = line_re_24 if self.redis_version < 2.5 else line_re_26
+        self.line_re = line_re_26 if self.redis_version == 2.6 else line_re_99
 
     def _record_duration(self, entry):
         ts = float(entry['timestamp']) * 1000 * 1000 # microseconds
