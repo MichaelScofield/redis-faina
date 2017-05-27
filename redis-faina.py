@@ -1,4 +1,5 @@
 #! /usr/bin/env python
+# coding=utf-8
 import argparse
 import sys
 from collections import defaultdict
@@ -16,7 +17,7 @@ line_re_99 = re.compile(r"""
 
 
 class StatCounter(object):
-    def __init__(self, redis_version=2.6, with_port=False):
+    def __init__(self, redis_version=2.6, with_port=False, ignored_commands=""):
         self.line_count = 0
         self.skipped_lines = 0
         self.commands = defaultdict(int)
@@ -25,6 +26,7 @@ class StatCounter(object):
         self.redis_version = redis_version
         self.line_re = line_re_26 if self.redis_version == 2.6 else line_re_99
         self.with_port = with_port
+        self.ignored_commands = frozenset([x.strip().upper() for x in ignored_commands.split(',')])
 
     def _record_command(self, entry):
         self.commands[entry['command']] += 1
@@ -63,9 +65,10 @@ class StatCounter(object):
         return [("Lines Processed", self.line_count)]
 
     def process_entry(self, entry):
-        self._record_command(entry)
-        if entry['key']:
-            self._record_key(entry['key'], entry['ip'], entry['port'])
+        if entry['command'] not in self.ignored_commands:
+            self._record_command(entry)
+            if entry['key']:
+                self._record_key(entry['key'], entry['ip'], entry['port'])
 
     def _top_n(self, stat):
         sorted_items = sorted(stat.iteritems(), key=lambda x: x[1], reverse=True)
@@ -125,7 +128,14 @@ if __name__ == '__main__':
         default=False,
         help="Aggregate keys by host and port, or solely by host.",
         required=False)
+    parser.add_argument(
+        '--ignored-commands',
+        default="",
+        help="不统计的命令,例如PING,INFO或者SLOWLOG",
+        required=False)
     args = parser.parse_args()
-    counter = StatCounter(redis_version=args.redis_version, with_port=args.with_port)
+    counter = StatCounter(redis_version=args.redis_version,
+                          with_port=args.with_port,
+                          ignored_commands=args.ignored_commands)
     counter.process_input(args.input)
     counter.print_stats()
